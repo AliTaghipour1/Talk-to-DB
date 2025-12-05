@@ -149,7 +149,7 @@ func (d *DatabaseMySqlImpl) Close() error {
 	return nil
 }
 
-func newDatabaseMySqlImpl(config MySqlConfig) (Database, error) {
+func NewDatabaseMySqlImpl(config MySqlConfig) (Database, error) {
 	result := &DatabaseMySqlImpl{
 		config: config,
 	}

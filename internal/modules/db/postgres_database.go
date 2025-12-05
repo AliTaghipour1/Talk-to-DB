@@ -207,7 +207,7 @@ func (d *DatabasePostgresImpl) GetSchemas() ([]string, error) {
 	return schemas, nil
 }
 
-func newDatabasePostgresImpl(config PostgresConfig) (Database, error) {
+func NewDatabasePostgresImpl(config PostgresConfig) (Database, error) {
 	result := &DatabasePostgresImpl{
 		config: config,
 	}
