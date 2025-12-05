@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/AliTaghipour1/Talk-to_DB/internal/config"
+	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/bot"
 	db2 "github.com/AliTaghipour1/Talk-to_DB/internal/modules/db"
 	"github.com/AliTaghipour1/Talk-to_DB/pkg/bot_api"
 	tgbotapi "github.com/ghiac/bale-bot-api"
@@ -63,9 +64,9 @@ func (s *Service) createDatabases(dbs []config.Database) {
 func runBot(serviceConfig *config.TalkToDBConfig) {
 	botApi := getBotApi(serviceConfig.CliBot.Token, serviceConfig.DebugMode)
 
-	_ = bot_api.NewSenderBot(botApi)
+	sender := bot_api.NewSenderBot(botApi)
 
-	//TODO
+	bot.NewBotUpdateHandler(sender, botApi, serviceConfig).Start()
 }
 
 func getBotApi(token string, debugMode bool) *tgbotapi.BotAPI {

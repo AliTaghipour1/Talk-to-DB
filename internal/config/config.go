@@ -7,9 +7,10 @@ import (
 )
 
 type TalkToDBConfig struct {
-	DebugMode bool
-	CliBot    Bot
-	Databases []Database
+	DebugMode      bool
+	CliBot         Bot
+	Databases      []Database
+	AllowedUserIds []int64
 }
 type Driver string
 

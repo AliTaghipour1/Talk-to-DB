@@ -1,7 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"github.com/AliTaghipour1/Talk-to_DB/internal"
+)
 
 func main() {
-	fmt.Println("Hello World")
+	internal.NewService().Run()
 }
