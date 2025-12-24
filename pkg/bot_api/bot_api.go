@@ -1,10 +1,10 @@
 package bot_api
 
 import (
-	"WordSearchBot/pkg/tracer"
 	"log"
 	"time"
 
+	"github.com/AliTaghipour1/Talk-to_DB/pkg/tracer"
 	tgbotapi "github.com/ghiac/bale-bot-api"
 )
 
