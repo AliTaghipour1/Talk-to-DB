@@ -51,7 +51,7 @@ func (d *DatabaseMySqlImpl) connect() error {
 	return nil
 }
 
-func (d *DatabaseMySqlImpl) GetTables() ([]Table, error) {
+func (d *DatabaseMySqlImpl) GetTables() (Tables, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}

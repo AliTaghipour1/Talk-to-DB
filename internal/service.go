@@ -29,7 +29,7 @@ func (s *Service) Run() {
 	log.Println("config:", string(configJsonText))
 
 	s.createDatabases(serviceConfig.Databases)
-	runBot(serviceConfig)
+	s.runBot(serviceConfig)
 }
 
 func (s *Service) createDatabases(dbs []config.Database) {
@@ -61,12 +61,12 @@ func (s *Service) createDatabases(dbs []config.Database) {
 	}
 }
 
-func runBot(serviceConfig *config.TalkToDBConfig) {
+func (s *Service) runBot(serviceConfig *config.TalkToDBConfig) {
 	botApi := getBotApi(serviceConfig.CliBot.Token, serviceConfig.DebugMode)
 
 	sender := bot_api.NewSenderBot(botApi)
 
-	bot.NewBotUpdateHandler(sender, botApi, serviceConfig).Start()
+	bot.NewBotUpdateHandler(sender, botApi, s.databases, serviceConfig).Start()
 }
 
 func getBotApi(token string, debugMode bool) *tgbotapi.BotAPI {

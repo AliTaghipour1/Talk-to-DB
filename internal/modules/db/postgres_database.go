@@ -68,7 +68,7 @@ func (d *DatabasePostgresImpl) connect() error {
 	return nil
 }
 
-func (d *DatabasePostgresImpl) GetTables() ([]Table, error) {
+func (d *DatabasePostgresImpl) GetTables() (Tables, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
