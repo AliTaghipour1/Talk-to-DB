@@ -127,7 +127,7 @@ func (d *DatabaseMySqlImpl) getColumns(tableName string) ([]Column, error) {
 	return columns, nil
 }
 
-func (d *DatabaseMySqlImpl) Query(query string, args ...interface{}) (*sql.Rows, error) {
+func (d *DatabaseMySqlImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -138,7 +138,7 @@ func (d *DatabaseMySqlImpl) Query(query string, args ...interface{}) (*sql.Rows,
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 
-	return rows, nil
+	return &QueryResult{Rows: rows}, nil
 }
 
 // Close closes the database connection

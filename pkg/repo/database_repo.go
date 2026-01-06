@@ -3,6 +3,7 @@ package repo
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"sync"
 )
@@ -26,6 +27,14 @@ type Database struct {
 	Name        string
 	Description string
 	Tables      []Table
+}
+
+func (s Database) Scheme() string {
+	indent, err := json.MarshalIndent(s, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+	return string(indent)
 }
 
 type fieldType int8
@@ -61,7 +70,7 @@ type DatabaseRepoMapImpl struct {
 }
 
 // NewDatabaseRepoMapImpl creates a new repository instance with file persistence
-func NewDatabaseRepoMapImpl(filePath string) (*DatabaseRepoMapImpl, error) {
+func NewDatabaseRepoMapImpl(filePath string) DatabaseRepo {
 	repo := &DatabaseRepoMapImpl{
 		databaseMap:    make(map[int]*Database),
 		nextDatabaseID: 1,
@@ -74,11 +83,11 @@ func NewDatabaseRepoMapImpl(filePath string) (*DatabaseRepoMapImpl, error) {
 	if err := repo.loadFromFile(); err != nil {
 		// If file doesn't exist, start with empty data (this is OK)
 		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to load repository data: %w", err)
+			log.Println("Error loading database:", err)
 		}
 	}
 
-	return repo, nil
+	return repo
 }
 
 // loadFromFile loads repository data from JSON file

@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/AliTaghipour1/Talk-to_DB/internal/config"
+	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/ai"
 	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/bot"
 	db2 "github.com/AliTaghipour1/Talk-to_DB/internal/modules/db"
 	"github.com/AliTaghipour1/Talk-to_DB/pkg/bot_api"
+	"github.com/AliTaghipour1/Talk-to_DB/pkg/repo"
 	tgbotapi "github.com/ghiac/bale-bot-api"
 )
 
@@ -53,6 +55,14 @@ func (s *Service) createDatabases(dbs []config.Database) {
 				Password: db.Pass,
 				Database: db.Name,
 			})
+		case config.Cockroach:
+			database, err = db2.NewDatabaseCockroachImpl(db2.CockroachConfig{
+				Host:     db.Host,
+				Port:     db.Port,
+				User:     db.User,
+				Password: db.Pass,
+				Database: db.Name,
+			})
 		}
 		if err != nil {
 			panic(fmt.Errorf("failed to create [%s] database: %v", db.Driver, err))
@@ -66,7 +76,9 @@ func (s *Service) runBot(serviceConfig *config.TalkToDBConfig) {
 
 	sender := bot_api.NewSenderBot(botApi)
 
-	bot.NewBotUpdateHandler(sender, botApi, s.databases, serviceConfig).Start()
+	databaseRepo := repo.NewDatabaseRepoMapImpl("pkg/repo/data.json")
+	bot.NewBotUpdateHandler(sender, botApi, s.databases, serviceConfig,
+		ai.NewAIModule(serviceConfig.AvalAi.ApiKey), databaseRepo).Start()
 }
 
 func getBotApi(token string, debugMode bool) *tgbotapi.BotAPI {

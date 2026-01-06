@@ -9,14 +9,16 @@ import (
 type TalkToDBConfig struct {
 	DebugMode      bool
 	CliBot         Bot
+	AvalAi         AvalAi
 	Databases      []Database
 	AllowedUserIds []int64
 }
 type Driver string
 
 const (
-	Postgres Driver = "postgres"
-	MySQL    Driver = "mysql"
+	Postgres  Driver = "postgres"
+	MySQL     Driver = "mysql"
+	Cockroach Driver = "cockroach"
 )
 
 type Database struct {
@@ -26,6 +28,10 @@ type Database struct {
 	Pass   string
 	Name   string
 	Driver Driver
+}
+
+type AvalAi struct {
+	ApiKey string
 }
 
 type Bot struct {

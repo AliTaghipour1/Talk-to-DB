@@ -8,56 +8,56 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type PostgresConfig struct {
+type CockroachConfig struct {
 	Host     string
 	Port     string
 	User     string
 	Password string
-	DBName   string
+	Database string
 	SSLMode  string
 	Schema   string // Default to "public" if empty
 }
 
-type DatabasePostgresImpl struct {
+type DatabaseCockroachImpl struct {
 	db     *sql.DB
-	config PostgresConfig
+	config CockroachConfig
 }
 
-func (d *DatabasePostgresImpl) connect() error {
+func (d *DatabaseCockroachImpl) connect() error {
 	// Set default schema if not provided
 	schema := d.config.Schema
 	if schema == "" {
 		schema = "public"
 	}
 
-	// Set default SSL mode if not provided
+	// Set default SSL mode if not provided (CockroachDB typically requires SSL in production)
 	sslMode := d.config.SSLMode
 	if sslMode == "" {
 		sslMode = "disable" // Default to disable for local development
 	}
 
-	// Build PostgreSQL connection string
+	// Build CockroachDB connection string (PostgreSQL-compatible format)
 	// Format: host=... port=... user=... password=... dbname=... sslmode=...
 	connParts := []string{
 		fmt.Sprintf("host=%s", d.config.Host),
 		fmt.Sprintf("port=%s", d.config.Port),
 		fmt.Sprintf("user=%s", d.config.User),
 		fmt.Sprintf("password=%s", d.config.Password),
-		fmt.Sprintf("dbname=%s", d.config.DBName),
+		fmt.Sprintf("dbname=%s", d.config.Database),
 		fmt.Sprintf("sslmode=%s", sslMode),
 	}
 	connStr := strings.Join(connParts, " ")
 
-	// Open database connection
+	// Open database connection (CockroachDB uses PostgreSQL driver)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return fmt.Errorf("failed to open PostgreSQL connection: %w", err)
+		return fmt.Errorf("failed to open CockroachDB connection: %w", err)
 	}
 
 	// Verify connection by pinging
 	if err := db.Ping(); err != nil {
 		db.Close()
-		return fmt.Errorf("failed to ping PostgreSQL database: %w", err)
+		return fmt.Errorf("failed to ping CockroachDB database: %w", err)
 	}
 
 	// Set connection pool settings for thread safety
@@ -68,7 +68,7 @@ func (d *DatabasePostgresImpl) connect() error {
 	return nil
 }
 
-func (d *DatabasePostgresImpl) GetTables() (Tables, error) {
+func (d *DatabaseCockroachImpl) GetTables() (Tables, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -80,6 +80,7 @@ func (d *DatabasePostgresImpl) GetTables() (Tables, error) {
 	}
 
 	// Query to get all table names from the specified schema
+	// CockroachDB uses the same information_schema as PostgreSQL
 	query := `
 		SELECT table_name 
 		FROM information_schema.tables 
@@ -120,7 +121,7 @@ func (d *DatabasePostgresImpl) GetTables() (Tables, error) {
 	return tables, nil
 }
 
-func (d *DatabasePostgresImpl) getColumns(tableName, schema string) ([]Column, error) {
+func (d *DatabaseCockroachImpl) getColumns(tableName, schema string) ([]Column, error) {
 	query := `
 		SELECT column_name, data_type 
 		FROM information_schema.columns 
@@ -150,12 +151,13 @@ func (d *DatabasePostgresImpl) getColumns(tableName, schema string) ([]Column, e
 	return columns, nil
 }
 
-func (d *DatabasePostgresImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
+func (d *DatabaseCockroachImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
 
 	// Use parameterized queries ($1, $2, ...) to prevent SQL injection
+	// CockroachDB uses PostgreSQL-style parameterized queries
 	rows, err := d.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
@@ -165,7 +167,7 @@ func (d *DatabasePostgresImpl) Query(query string, args ...interface{}) (*QueryR
 }
 
 // Close closes the database connection
-func (d *DatabasePostgresImpl) Close() error {
+func (d *DatabaseCockroachImpl) Close() error {
 	if d.db != nil {
 		return d.db.Close()
 	}
@@ -173,7 +175,7 @@ func (d *DatabasePostgresImpl) Close() error {
 }
 
 // GetSchemas returns all available schemas in the database
-func (d *DatabasePostgresImpl) GetSchemas() ([]string, error) {
+func (d *DatabaseCockroachImpl) GetSchemas() ([]string, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -181,7 +183,7 @@ func (d *DatabasePostgresImpl) GetSchemas() ([]string, error) {
 	query := `
 		SELECT schema_name 
 		FROM information_schema.schemata 
-		WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast')
+		WHERE schema_name NOT IN ('information_schema', 'pg_catalog', 'pg_toast', 'crdb_internal')
 		ORDER BY schema_name
 	`
 
@@ -207,14 +209,14 @@ func (d *DatabasePostgresImpl) GetSchemas() ([]string, error) {
 	return schemas, nil
 }
 
-func NewDatabasePostgresImpl(config PostgresConfig) (Database, error) {
-	result := &DatabasePostgresImpl{
+func NewDatabaseCockroachImpl(config CockroachConfig) (Database, error) {
+	result := &DatabaseCockroachImpl{
 		config: config,
 	}
 
 	err := result.connect()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create PostgreSQL database instance: %w", err)
+		return nil, fmt.Errorf("failed to create CockroachDB database instance: %w", err)
 	}
 
 	return result, nil
