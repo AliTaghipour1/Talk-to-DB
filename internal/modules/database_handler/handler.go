@@ -8,17 +8,25 @@ import (
 	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/ai"
 	db2 "github.com/AliTaghipour1/Talk-to_DB/internal/modules/db"
 	"github.com/AliTaghipour1/Talk-to_DB/pkg/repo"
-	tgbotapi "github.com/ghiac/bale-bot-api"
 )
 
 type DatabaseHandler struct {
-	botAPI          *tgbotapi.BotAPI
 	allowedUserIds  []int64
 	databases       map[config.Driver]db2.Database
 	currentDriver   config.Driver
 	currentDatabase *repo.Database
 	databaseRepo    repo.DatabaseRepo
 	aiModule        *ai.AIModule
+}
+
+func NewDatabaseHandler(allowedUserIds []int64, databases map[config.Driver]db2.Database, databaseRepo repo.DatabaseRepo,
+	aiModule *ai.AIModule) *DatabaseHandler {
+	return &DatabaseHandler{
+		allowedUserIds: allowedUserIds,
+		databases:      databases,
+		databaseRepo:   databaseRepo,
+		aiModule:       aiModule,
+	}
 }
 
 var (
@@ -41,7 +49,7 @@ func (d *DatabaseHandler) HandleChoosingDatabase(databaseID int) error {
 	return nil
 }
 
-func (d *DatabaseHandler) GetDatabases() ([]repo.Database, error) {
+func (d *DatabaseHandler) GetDatabases() ([]Database, error) {
 	if d.currentDriver == "" {
 		return nil, ErrEmptyDriver
 	}
@@ -51,7 +59,16 @@ func (d *DatabaseHandler) GetDatabases() ([]repo.Database, error) {
 		return nil, err
 	}
 
-	return databases, nil
+	return convertRepoDatabasesToModuleModel(databases), nil
+}
+
+func (d *DatabaseHandler) GetCurrentDatabase() (Database, error) {
+	if d.currentDatabase == nil {
+		return Database{}, ErrEmptyDriver
+	}
+
+	db := convertRepoDatabasesToModuleModel([]repo.Database{*d.currentDatabase})
+	return db[0], nil
 }
 
 func (d *DatabaseHandler) CreateDatabase() (int, error) {
@@ -97,7 +114,9 @@ func (d *DatabaseHandler) Query(text string) (string, error) {
 		return "", ErrNotConnected
 	}
 
-	query := d.aiModule.GetQuery(d.currentDatabase.Scheme(), text)
+	database := convertRepoDatabaseToModuleModel(*d.currentDatabase)
+
+	query := d.aiModule.GetQuery(database.Scheme(), text)
 
 	rows, err := d.databases[d.currentDriver].Query(query)
 	if err != nil {
@@ -111,4 +130,27 @@ func (d *DatabaseHandler) Query(text string) (string, error) {
 	}
 
 	return result, nil
+}
+
+func (d *DatabaseHandler) SetDescription(tableName string, columnName *string, description string) error {
+	table, found := d.currentDatabase.GetTableByName(tableName)
+	if !found {
+		return errors.New("table not found")
+	}
+	filedType := repo.TableFieldType
+	fieldID := table.ID
+	if columnName != nil {
+		filedType = repo.ColumnFieldType
+		column, columnFound := table.GetColumnByName(*columnName)
+		if !columnFound {
+			return errors.New("column not found")
+		}
+		fieldID = column.ID
+	}
+
+	err := d.databaseRepo.SetDescription(d.currentDatabase.ID, description, fieldID, filedType)
+	if err != nil {
+		return err
+	}
+	return nil
 }

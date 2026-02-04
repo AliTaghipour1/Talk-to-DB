@@ -29,12 +29,22 @@ type Database struct {
 	Tables      []Table
 }
 
-func (s Database) Scheme() string {
-	indent, err := json.MarshalIndent(s, "", "\t")
-	if err != nil {
-		panic(err)
+func (s Table) GetColumnByName(name string) (Column, bool) {
+	for _, column := range s.Columns {
+		if column.Name == name {
+			return column, true
+		}
 	}
-	return string(indent)
+	return Column{}, false
+}
+
+func (s Database) GetTableByName(name string) (Table, bool) {
+	for _, table := range s.Tables {
+		if table.Name == name {
+			return table, true
+		}
+	}
+	return Table{}, false
 }
 
 type fieldType int8

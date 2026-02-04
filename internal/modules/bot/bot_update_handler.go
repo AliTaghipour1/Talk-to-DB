@@ -6,20 +6,36 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/AliTaghipour1/Talk-to_DB/internal/config"
 	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/bot/messages"
 	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/database_handler"
 	"github.com/AliTaghipour1/Talk-to_DB/pkg/bot_api"
-	"github.com/AliTaghipour1/Talk-to_DB/pkg/repo"
 	tgbotapi "github.com/ghiac/bale-bot-api"
 )
 
 type UpdateHandler struct {
-	databaseHandler database_handler.DatabaseHandler
-	sender          bot_api.BotApi
-	botAPI          *tgbotapi.BotAPI
-	allowedUserIds  []int64
+	databaseHandler  *database_handler.DatabaseHandler
+	sender           bot_api.BotApi
+	botAPI           *tgbotapi.BotAPI
+	allowedUserIds   []int64
+	usersData        sync.Map
+	stateDataManager *stateDataManager
+}
+
+func NewBotUpdateHandler(databaseHandler *database_handler.DatabaseHandler, sender bot_api.BotApi,
+	botAPI *tgbotapi.BotAPI, serviceConfig *config.TalkToDBConfig) *UpdateHandler {
+
+	result := &UpdateHandler{
+		botAPI:           botAPI,
+		sender:           sender,
+		allowedUserIds:   serviceConfig.AllowedUserIds,
+		databaseHandler:  databaseHandler,
+		stateDataManager: newStateDataManager(),
+	}
+
+	return result
 }
 
 func (u *UpdateHandler) handleUpdate(update *tgbotapi.Update) {
@@ -71,6 +87,14 @@ func (u *UpdateHandler) handleCallback(update *tgbotapi.Update) {
 				return
 			}
 			u.handleChoosingDatabase(userID, databaseID)
+		} else if strings.HasPrefix(callback, "table-data-") {
+			tableName := strings.TrimPrefix(callback, "table-data-")
+			u.handleChosenTable(tableName, userID)
+		} else if strings.HasPrefix(callback, "column-data-") {
+			columnData := strings.Split(strings.TrimPrefix(callback, "column-data-"), "-")
+			tableName := columnData[0]
+			columnName := columnData[1]
+			u.handleChosenColumn(tableName, columnName, userID)
 		}
 	}
 
@@ -81,7 +105,6 @@ func (u *UpdateHandler) handleCallback(update *tgbotapi.Update) {
 
 	return
 }
-
 func (u *UpdateHandler) handleMessage(update *tgbotapi.Update) {
 	userID := int64(update.Message.From.ID)
 
@@ -98,11 +121,37 @@ func (u *UpdateHandler) handleMessage(update *tgbotapi.Update) {
 	case "/connect_postgres", "/connect_mysql", "/connect_cockroach":
 		db := strings.TrimPrefix(text, "/connect_")
 		u.handleSwitchDriver(db, userID)
+	case "/set_description":
+		u.handleSetDescriptionCommand(userID)
 	default:
-		u.handleQuery(text, userID)
+		u.handleStatefulMessage(text, userID)
 	}
 
 	return
+}
+
+func (u *UpdateHandler) handleStatefulMessage(text string, userID int64) {
+	ok := u.handleSetDescription(text, userID)
+	if ok {
+		return
+	}
+
+	u.handleQuery(text, userID)
+}
+
+func (u *UpdateHandler) handleSetDescription(text string, userID int64) bool {
+	defer u.stateDataManager.EmptyUserStateData(userID)
+
+	data, ok := u.stateDataManager.GetDescriptionData(userID)
+	if !ok {
+		return false
+	}
+
+	err := u.databaseHandler.SetDescription(data.Table, data.Column, text)
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func (u *UpdateHandler) handleQuery(text string, userID int64) {
@@ -123,6 +172,7 @@ func (u *UpdateHandler) handleQuery(text string, userID int64) {
 }
 
 func (u *UpdateHandler) handleStart(userID int64) {
+	defer u.stateDataManager.EmptyUserStateData(userID)
 	databases, err := u.databaseHandler.GetDatabases()
 	if err != nil {
 		return
@@ -147,7 +197,7 @@ func (u *UpdateHandler) handleChoosingDatabase(userID int64, databaseID int) {
 	})
 }
 
-func createDatabaseMessageData(dbs []repo.Database) []messages.DatabaseData {
+func createDatabaseMessageData(dbs []database_handler.Database) []messages.DatabaseData {
 	var result []messages.DatabaseData
 	for _, db := range dbs {
 		result = append(result, messages.DatabaseData{
@@ -159,7 +209,31 @@ func createDatabaseMessageData(dbs []repo.Database) []messages.DatabaseData {
 	return result
 }
 
+func createDatabaseTablesData(db database_handler.Database) []messages.TableData {
+	var result []messages.TableData
+	for _, table := range db.Tables {
+		result = append(result, messages.TableData{
+			Name: table.Name,
+		})
+	}
+
+	return result
+}
+
+func createTableColumnsData(db database_handler.Table) []messages.ColumnData {
+	var result []messages.ColumnData
+	for _, table := range db.Columns {
+		result = append(result, messages.ColumnData{
+			Name:      table.Name,
+			TableName: table.Name,
+		})
+	}
+
+	return result
+}
+
 func (u *UpdateHandler) handleSwitchDriver(db string, userID int64) {
+	defer u.stateDataManager.EmptyUserStateData(userID)
 	err := u.databaseHandler.SwitchDriver(db)
 	if err != nil {
 		return
@@ -172,6 +246,7 @@ func (u *UpdateHandler) handleSwitchDriver(db string, userID int64) {
 }
 
 func (u *UpdateHandler) handleCreateDatabase(userID int64) {
+	defer u.stateDataManager.EmptyUserStateData(userID)
 	database, err := u.databaseHandler.CreateDatabase()
 	if err != nil {
 		return
@@ -188,16 +263,6 @@ func (u *UpdateHandler) isUserAllowedToUseBot(userId int64) bool {
 	return slices.Contains(u.allowedUserIds, userId)
 }
 
-func NewBotUpdateHandler(sender bot_api.BotApi, botAPI *tgbotapi.BotAPI, serviceConfig *config.TalkToDBConfig) *UpdateHandler {
-	result := &UpdateHandler{
-		botAPI:         botAPI,
-		sender:         sender,
-		allowedUserIds: serviceConfig.AllowedUserIds,
-	}
-
-	return result
-}
-
 func (u *UpdateHandler) Start() {
 	updatesChan, err := u.botAPI.GetUpdatesChan(tgbotapi.NewUpdate(0))
 	if err != nil {
@@ -207,4 +272,68 @@ func (u *UpdateHandler) Start() {
 	for update := range updatesChan {
 		u.handleUpdate(&update)
 	}
+}
+
+func (u *UpdateHandler) handleSetDescriptionCommand(userID int64) {
+	defer u.stateDataManager.EmptyUserStateData(userID)
+	database, err := u.databaseHandler.GetCurrentDatabase()
+	if err != nil {
+		return
+	}
+
+	u.sender.SendMessage(bot_api.Message{
+		Text:        "Choose table",
+		ChatId:      userID,
+		ReplyMarkup: messages.GenerateDatabaseMenuButtons(createDatabaseTablesData(database)),
+	})
+}
+
+func (u *UpdateHandler) handleChosenTable(tableName string, userID int64) {
+	database, err := u.databaseHandler.GetCurrentDatabase()
+	if err != nil {
+		return
+	}
+
+	table, ok := database.GetTableByName(tableName)
+	if !ok {
+		return
+	}
+
+	err = u.stateDataManager.AddDescriptionTableData(tableName, userID)
+	if err != nil {
+		return
+	}
+
+	u.sender.SendMessage(bot_api.Message{
+		Text:        fmt.Sprintf("Choose column or send description. current descrition for this table: \n%s", table.Description),
+		ChatId:      userID,
+		ReplyMarkup: messages.GenerateTableMenuButtons(createTableColumnsData(table)),
+	})
+}
+
+func (u *UpdateHandler) handleChosenColumn(tableName string, columnName string, userID int64) {
+	database, err := u.databaseHandler.GetCurrentDatabase()
+	if err != nil {
+		return
+	}
+
+	table, ok := database.GetTableByName(tableName)
+	if !ok {
+		return
+	}
+
+	_, ok = table.GetColumnByName(columnName)
+	if !ok {
+		return
+	}
+
+	err = u.stateDataManager.AddDescriptionColumnData(columnName, userID)
+	if err != nil {
+		return
+	}
+
+	u.sender.SendMessage(bot_api.Message{
+		Text:   fmt.Sprintf("Send description for the selected column. current descrition for this table: \n%s", table.Description),
+		ChatId: userID,
+	})
 }

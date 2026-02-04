@@ -9,6 +9,7 @@ import (
 	"github.com/AliTaghipour1/Talk-to_DB/internal/config"
 	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/ai"
 	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/bot"
+	"github.com/AliTaghipour1/Talk-to_DB/internal/modules/database_handler"
 	db2 "github.com/AliTaghipour1/Talk-to_DB/internal/modules/db"
 	"github.com/AliTaghipour1/Talk-to_DB/pkg/bot_api"
 	"github.com/AliTaghipour1/Talk-to_DB/pkg/repo"
@@ -31,7 +32,8 @@ func (s *Service) Run() {
 	log.Println("config:", string(configJsonText))
 
 	s.createDatabases(serviceConfig.Databases)
-	s.runBot(serviceConfig)
+	databaseRepo := repo.NewDatabaseRepoMapImpl("pkg/repo/data.json")
+	s.runBot(serviceConfig, databaseRepo)
 }
 
 func (s *Service) createDatabases(dbs []config.Database) {
@@ -71,14 +73,12 @@ func (s *Service) createDatabases(dbs []config.Database) {
 	}
 }
 
-func (s *Service) runBot(serviceConfig *config.TalkToDBConfig) {
+func (s *Service) runBot(serviceConfig *config.TalkToDBConfig, databaseRepo repo.DatabaseRepo) {
 	botApi := getBotApi(serviceConfig.CliBot.Token, serviceConfig.DebugMode)
-
 	sender := bot_api.NewSenderBot(botApi)
 
-	databaseRepo := repo.NewDatabaseRepoMapImpl("pkg/repo/data.json")
-	bot.NewBotUpdateHandler(sender, botApi, s.databases, serviceConfig,
-		ai.NewAIModule(serviceConfig.AvalAi.ApiKey), databaseRepo).Start()
+	dbHandler := database_handler.NewDatabaseHandler(serviceConfig.AllowedUserIds, s.databases, databaseRepo, ai.NewAIModule(serviceConfig.AvalAi.ApiKey))
+	bot.NewBotUpdateHandler(dbHandler, sender, botApi, serviceConfig).Start()
 }
 
 func getBotApi(token string, debugMode bool) *tgbotapi.BotAPI {
