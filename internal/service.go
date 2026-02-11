@@ -38,34 +38,8 @@ func (s *Service) Run() {
 
 func (s *Service) createDatabases(dbs []config.Database) {
 	for _, db := range dbs {
-		var database db2.Database
-		var err error
-		switch db.Driver {
-		case config.Postgres:
-			database, err = db2.NewDatabasePostgresImpl(db2.PostgresConfig{
-				Host:     db.Host,
-				Port:     db.Port,
-				User:     db.User,
-				Password: db.Pass,
-				DBName:   db.Name,
-			})
-		case config.MySQL:
-			database, err = db2.NewDatabaseMySqlImpl(db2.MySqlConfig{
-				Host:     db.Host,
-				Port:     db.Port,
-				User:     db.User,
-				Password: db.Pass,
-				Database: db.Name,
-			})
-		case config.Cockroach:
-			database, err = db2.NewDatabaseCockroachImpl(db2.CockroachConfig{
-				Host:     db.Host,
-				Port:     db.Port,
-				User:     db.User,
-				Password: db.Pass,
-				Database: db.Name,
-			})
-		}
+		cfg, driver := convertDatabaseConfigModel(db)
+		database, err := db2.NewDatabase(cfg, driver)
 		if err != nil {
 			panic(fmt.Errorf("failed to create [%s] database: %v", db.Driver, err))
 		}
@@ -93,4 +67,26 @@ func getBotApi(token string, debugMode bool) *tgbotapi.BotAPI {
 	log.Printf("Authorized on account %s", botApi.Self.UserName)
 
 	return botApi
+}
+
+func convertDatabaseConfigModel(database config.Database) (db2.DatabaseConfig, db2.Driver) {
+	var driver db2.Driver
+	switch database.Driver {
+	case config.Postgres:
+		driver = db2.Postgres
+	case config.MySQL:
+		driver = db2.MySQL
+	case config.Cockroach:
+		driver = db2.Cockroach
+	}
+
+	return db2.DatabaseConfig{
+		Host:     database.Host,
+		Port:     database.Port,
+		User:     database.User,
+		Password: database.Pass,
+		Database: database.Name,
+		SSLMode:  "disable",
+		Schema:   "public",
+	}, driver
 }

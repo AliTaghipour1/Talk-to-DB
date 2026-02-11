@@ -8,7 +8,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type CockroachConfig struct {
+type cockroachConfig struct {
 	Host     string
 	Port     string
 	User     string
@@ -18,12 +18,12 @@ type CockroachConfig struct {
 	Schema   string // Default to "public" if empty
 }
 
-type DatabaseCockroachImpl struct {
+type databaseCockroachImpl struct {
 	db     *sql.DB
-	config CockroachConfig
+	config cockroachConfig
 }
 
-func (d *DatabaseCockroachImpl) connect() error {
+func (d *databaseCockroachImpl) connect() error {
 	// Set default schema if not provided
 	schema := d.config.Schema
 	if schema == "" {
@@ -68,7 +68,7 @@ func (d *DatabaseCockroachImpl) connect() error {
 	return nil
 }
 
-func (d *DatabaseCockroachImpl) GetTables() (Tables, error) {
+func (d *databaseCockroachImpl) GetTables() (Tables, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -121,7 +121,7 @@ func (d *DatabaseCockroachImpl) GetTables() (Tables, error) {
 	return tables, nil
 }
 
-func (d *DatabaseCockroachImpl) getColumns(tableName, schema string) ([]Column, error) {
+func (d *databaseCockroachImpl) getColumns(tableName, schema string) ([]Column, error) {
 	query := `
 		SELECT column_name, data_type 
 		FROM information_schema.columns 
@@ -151,7 +151,7 @@ func (d *DatabaseCockroachImpl) getColumns(tableName, schema string) ([]Column, 
 	return columns, nil
 }
 
-func (d *DatabaseCockroachImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
+func (d *databaseCockroachImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -167,7 +167,7 @@ func (d *DatabaseCockroachImpl) Query(query string, args ...interface{}) (*Query
 }
 
 // Close closes the database connection
-func (d *DatabaseCockroachImpl) Close() error {
+func (d *databaseCockroachImpl) Close() error {
 	if d.db != nil {
 		return d.db.Close()
 	}
@@ -175,7 +175,7 @@ func (d *DatabaseCockroachImpl) Close() error {
 }
 
 // GetSchemas returns all available schemas in the database
-func (d *DatabaseCockroachImpl) GetSchemas() ([]string, error) {
+func (d *databaseCockroachImpl) GetSchemas() ([]string, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -209,8 +209,8 @@ func (d *DatabaseCockroachImpl) GetSchemas() ([]string, error) {
 	return schemas, nil
 }
 
-func NewDatabaseCockroachImpl(config CockroachConfig) (Database, error) {
-	result := &DatabaseCockroachImpl{
+func newDatabaseCockroachImpl(config cockroachConfig) (Database, error) {
+	result := &databaseCockroachImpl{
 		config: config,
 	}
 

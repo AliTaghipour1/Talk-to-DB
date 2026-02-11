@@ -7,7 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type MySqlConfig struct {
+type mySqlConfig struct {
 	Host     string
 	Port     string
 	User     string
@@ -15,12 +15,12 @@ type MySqlConfig struct {
 	Database string
 }
 
-type DatabaseMySqlImpl struct {
+type databaseMySqlImpl struct {
 	db     *sql.DB
-	config MySqlConfig
+	config mySqlConfig
 }
 
-func (d *DatabaseMySqlImpl) connect() error {
+func (d *databaseMySqlImpl) connect() error {
 	// Build MySQL connection string
 	// Format: username:password@tcp(host:port)/database?parseTime=true
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
@@ -51,7 +51,7 @@ func (d *DatabaseMySqlImpl) connect() error {
 	return nil
 }
 
-func (d *DatabaseMySqlImpl) GetTables() (Tables, error) {
+func (d *databaseMySqlImpl) GetTables() (Tables, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -97,7 +97,7 @@ func (d *DatabaseMySqlImpl) GetTables() (Tables, error) {
 	return tables, nil
 }
 
-func (d *DatabaseMySqlImpl) getColumns(tableName string) ([]Column, error) {
+func (d *databaseMySqlImpl) getColumns(tableName string) ([]Column, error) {
 	query := `
 		SELECT COLUMN_NAME, DATA_TYPE 
 		FROM INFORMATION_SCHEMA.COLUMNS 
@@ -127,7 +127,7 @@ func (d *DatabaseMySqlImpl) getColumns(tableName string) ([]Column, error) {
 	return columns, nil
 }
 
-func (d *DatabaseMySqlImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
+func (d *databaseMySqlImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -142,15 +142,15 @@ func (d *DatabaseMySqlImpl) Query(query string, args ...interface{}) (*QueryResu
 }
 
 // Close closes the database connection
-func (d *DatabaseMySqlImpl) Close() error {
+func (d *databaseMySqlImpl) Close() error {
 	if d.db != nil {
 		return d.db.Close()
 	}
 	return nil
 }
 
-func NewDatabaseMySqlImpl(config MySqlConfig) (Database, error) {
-	result := &DatabaseMySqlImpl{
+func newDatabaseMySqlImpl(config mySqlConfig) (Database, error) {
+	result := &databaseMySqlImpl{
 		config: config,
 	}
 

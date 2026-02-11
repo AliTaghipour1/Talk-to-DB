@@ -72,7 +72,6 @@ func (u *UpdateHandler) handleNonPrivateUpdate(chatId int64) {
 func (u *UpdateHandler) handleCallback(update *tgbotapi.Update) {
 	callback := update.CallbackQuery.Data
 	userID := int64(update.CallbackQuery.From.ID)
-	callbackQueryId := update.CallbackQuery.ID
 
 	if !u.isUserAllowedToUseBot(userID) {
 		return
@@ -92,16 +91,11 @@ func (u *UpdateHandler) handleCallback(update *tgbotapi.Update) {
 			u.handleChosenTable(tableName, userID)
 		} else if strings.HasPrefix(callback, "column-data-") {
 			columnData := strings.Split(strings.TrimPrefix(callback, "column-data-"), "-")
-			tableName := columnData[0]
-			columnName := columnData[1]
+			columnName := columnData[0]
+			tableName := columnData[1]
 			u.handleChosenColumn(tableName, columnName, userID)
 		}
 	}
-
-	u.sender.SendMessage(bot_api.Message{
-		Text:   callback + callbackQueryId,
-		ChatId: userID,
-	})
 
 	return
 }
@@ -151,6 +145,11 @@ func (u *UpdateHandler) handleSetDescription(text string, userID int64) bool {
 	if err != nil {
 		return false
 	}
+
+	u.sender.SendMessage(bot_api.Message{
+		Text:   "Successfully set description.",
+		ChatId: userID,
+	})
 	return true
 }
 
@@ -220,11 +219,11 @@ func createDatabaseTablesData(db database_handler.Database) []messages.TableData
 	return result
 }
 
-func createTableColumnsData(db database_handler.Table) []messages.ColumnData {
+func createTableColumnsData(table database_handler.Table) []messages.ColumnData {
 	var result []messages.ColumnData
-	for _, table := range db.Columns {
+	for _, column := range table.Columns {
 		result = append(result, messages.ColumnData{
-			Name:      table.Name,
+			Name:      column.Name,
 			TableName: table.Name,
 		})
 	}
@@ -305,13 +304,14 @@ func (u *UpdateHandler) handleChosenTable(tableName string, userID int64) {
 	}
 
 	u.sender.SendMessage(bot_api.Message{
-		Text:        fmt.Sprintf("Choose column or send description. current descrition for this table: \n%s", table.Description),
+		Text:        fmt.Sprintf("Choose column or send description. current descrition for %s table: \n%s", table.Name, table.Description),
 		ChatId:      userID,
 		ReplyMarkup: messages.GenerateTableMenuButtons(createTableColumnsData(table)),
 	})
 }
 
 func (u *UpdateHandler) handleChosenColumn(tableName string, columnName string, userID int64) {
+	fmt.Println(tableName, columnName)
 	database, err := u.databaseHandler.GetCurrentDatabase()
 	if err != nil {
 		return
@@ -322,7 +322,7 @@ func (u *UpdateHandler) handleChosenColumn(tableName string, columnName string, 
 		return
 	}
 
-	_, ok = table.GetColumnByName(columnName)
+	column, ok := table.GetColumnByName(columnName)
 	if !ok {
 		return
 	}
@@ -333,7 +333,7 @@ func (u *UpdateHandler) handleChosenColumn(tableName string, columnName string, 
 	}
 
 	u.sender.SendMessage(bot_api.Message{
-		Text:   fmt.Sprintf("Send description for the selected column. current descrition for this table: \n%s", table.Description),
+		Text:   fmt.Sprintf("Send description for the selected column. current descrition for %s column: \n%s", column.Name, column.Description),
 		ChatId: userID,
 	})
 }

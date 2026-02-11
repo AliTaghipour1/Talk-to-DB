@@ -11,12 +11,13 @@ import (
 )
 
 type DatabaseHandler struct {
-	allowedUserIds  []int64
-	databases       map[config.Driver]db2.Database
-	currentDriver   config.Driver
-	currentDatabase *repo.Database
-	databaseRepo    repo.DatabaseRepo
-	aiModule        *ai.AIModule
+	allowedUserIds    []int64
+	databases         map[config.Driver]db2.Database
+	currentDriver     config.Driver
+	currentDatabase   *repo.Database
+	currentDatabaseID *int
+	databaseRepo      repo.DatabaseRepo
+	aiModule          *ai.AIModule
 }
 
 func NewDatabaseHandler(allowedUserIds []int64, databases map[config.Driver]db2.Database, databaseRepo repo.DatabaseRepo,
@@ -39,12 +40,12 @@ func (d *DatabaseHandler) HandleChoosingDatabase(databaseID int) error {
 		return ErrEmptyDriver
 	}
 
-	database, err := d.databaseRepo.GetDatabase(databaseID)
+	_, err := d.databaseRepo.GetDatabase(databaseID)
 	if err != nil {
 		return err
 	}
 
-	d.currentDatabase = &database
+	d.currentDatabaseID = &databaseID
 
 	return nil
 }
@@ -63,11 +64,16 @@ func (d *DatabaseHandler) GetDatabases() ([]Database, error) {
 }
 
 func (d *DatabaseHandler) GetCurrentDatabase() (Database, error) {
-	if d.currentDatabase == nil {
+	if d.currentDatabaseID == nil {
 		return Database{}, ErrEmptyDriver
 	}
 
-	db := convertRepoDatabasesToModuleModel([]repo.Database{*d.currentDatabase})
+	currentDatabase, err := d.databaseRepo.GetDatabase(*d.currentDatabaseID)
+	if err != nil {
+		return Database{}, err
+	}
+
+	db := convertRepoDatabasesToModuleModel([]repo.Database{currentDatabase})
 	return db[0], nil
 }
 
@@ -110,11 +116,16 @@ func (d *DatabaseHandler) SwitchDriver(db string) error {
 }
 
 func (d *DatabaseHandler) Query(text string) (string, error) {
-	if d.currentDatabase == nil {
+	if d.currentDatabaseID == nil {
 		return "", ErrNotConnected
 	}
 
-	database := convertRepoDatabaseToModuleModel(*d.currentDatabase)
+	currentDatabase, err := d.databaseRepo.GetDatabase(*d.currentDatabaseID)
+	if err != nil {
+		return "", err
+	}
+
+	database := convertRepoDatabaseToModuleModel(currentDatabase)
 
 	query := d.aiModule.GetQuery(database.Scheme(), text)
 
@@ -133,7 +144,15 @@ func (d *DatabaseHandler) Query(text string) (string, error) {
 }
 
 func (d *DatabaseHandler) SetDescription(tableName string, columnName *string, description string) error {
-	table, found := d.currentDatabase.GetTableByName(tableName)
+	if d.currentDatabaseID == nil {
+		return ErrNotConnected
+	}
+	currentDatabase, err := d.databaseRepo.GetDatabase(*d.currentDatabaseID)
+	if err != nil {
+		return err
+	}
+
+	table, found := currentDatabase.GetTableByName(tableName)
 	if !found {
 		return errors.New("table not found")
 	}
@@ -148,7 +167,7 @@ func (d *DatabaseHandler) SetDescription(tableName string, columnName *string, d
 		fieldID = column.ID
 	}
 
-	err := d.databaseRepo.SetDescription(d.currentDatabase.ID, description, fieldID, filedType)
+	err = d.databaseRepo.SetDescription(currentDatabase.ID, description, fieldID, filedType)
 	if err != nil {
 		return err
 	}

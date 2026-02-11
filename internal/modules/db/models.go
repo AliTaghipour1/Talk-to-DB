@@ -116,3 +116,71 @@ func (t Tables) ToRepositoryTableList() []repo.Table {
 	}
 	return result
 }
+
+type DatabaseConfig struct {
+	Host     string
+	Port     string
+	User     string
+	Password string
+	Database string
+	SSLMode  string
+	Schema   string // Default to "public" if empty
+}
+
+type Driver int8
+
+const (
+	Unknown Driver = iota
+	Postgres
+	MySQL
+	Cockroach
+)
+
+func (d Driver) String() string {
+	switch d {
+	case Postgres:
+		return "postgres"
+	case MySQL:
+		return "mysql"
+	case Cockroach:
+		return "cockroach"
+	}
+	return "unknown"
+}
+
+func NewDatabase(cfg DatabaseConfig, driver Driver) (Database, error) {
+	var database Database
+	var err error
+	switch driver {
+	case Postgres:
+		database, err = newDatabasePostgresImpl(postgresConfig{
+			Host:     cfg.Host,
+			Port:     cfg.Port,
+			User:     cfg.User,
+			Password: cfg.Password,
+			DBName:   cfg.Database,
+		})
+	case MySQL:
+		database, err = newDatabaseMySqlImpl(mySqlConfig{
+			Host:     cfg.Host,
+			Port:     cfg.Port,
+			User:     cfg.User,
+			Password: cfg.Password,
+			Database: cfg.Database,
+		})
+	case Cockroach:
+		database, err = newDatabaseCockroachImpl(cockroachConfig{
+			Host:     cfg.Host,
+			Port:     cfg.Port,
+			User:     cfg.User,
+			Password: cfg.Password,
+			Database: cfg.Database,
+		})
+	default:
+		err = fmt.Errorf("unknown database driver: %s", driver)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return database, nil
+}

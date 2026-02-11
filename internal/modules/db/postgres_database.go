@@ -8,7 +8,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-type PostgresConfig struct {
+type postgresConfig struct {
 	Host     string
 	Port     string
 	User     string
@@ -18,12 +18,12 @@ type PostgresConfig struct {
 	Schema   string // Default to "public" if empty
 }
 
-type DatabasePostgresImpl struct {
+type databasePostgresImpl struct {
 	db     *sql.DB
-	config PostgresConfig
+	config postgresConfig
 }
 
-func (d *DatabasePostgresImpl) connect() error {
+func (d *databasePostgresImpl) connect() error {
 	// Set default schema if not provided
 	schema := d.config.Schema
 	if schema == "" {
@@ -68,7 +68,7 @@ func (d *DatabasePostgresImpl) connect() error {
 	return nil
 }
 
-func (d *DatabasePostgresImpl) GetTables() (Tables, error) {
+func (d *databasePostgresImpl) GetTables() (Tables, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -120,7 +120,7 @@ func (d *DatabasePostgresImpl) GetTables() (Tables, error) {
 	return tables, nil
 }
 
-func (d *DatabasePostgresImpl) getColumns(tableName, schema string) ([]Column, error) {
+func (d *databasePostgresImpl) getColumns(tableName, schema string) ([]Column, error) {
 	query := `
 		SELECT column_name, data_type 
 		FROM information_schema.columns 
@@ -150,7 +150,7 @@ func (d *DatabasePostgresImpl) getColumns(tableName, schema string) ([]Column, e
 	return columns, nil
 }
 
-func (d *DatabasePostgresImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
+func (d *databasePostgresImpl) Query(query string, args ...interface{}) (*QueryResult, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -165,7 +165,7 @@ func (d *DatabasePostgresImpl) Query(query string, args ...interface{}) (*QueryR
 }
 
 // Close closes the database connection
-func (d *DatabasePostgresImpl) Close() error {
+func (d *databasePostgresImpl) Close() error {
 	if d.db != nil {
 		return d.db.Close()
 	}
@@ -173,7 +173,7 @@ func (d *DatabasePostgresImpl) Close() error {
 }
 
 // GetSchemas returns all available schemas in the database
-func (d *DatabasePostgresImpl) GetSchemas() ([]string, error) {
+func (d *databasePostgresImpl) GetSchemas() ([]string, error) {
 	if d.db == nil {
 		return nil, fmt.Errorf("database connection is not established")
 	}
@@ -207,8 +207,8 @@ func (d *DatabasePostgresImpl) GetSchemas() ([]string, error) {
 	return schemas, nil
 }
 
-func NewDatabasePostgresImpl(config PostgresConfig) (Database, error) {
-	result := &DatabasePostgresImpl{
+func newDatabasePostgresImpl(config postgresConfig) (Database, error) {
+	result := &databasePostgresImpl{
 		config: config,
 	}
 
