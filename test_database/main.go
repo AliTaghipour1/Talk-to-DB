@@ -9,7 +9,7 @@ import (
 func main() {
 	database, err := db.NewDatabase(db.DatabaseConfig{
 		Host:     "localhost",
-		Port:     "55007",
+		Port:     "55002",
 		User:     "cockroach",
 		Password: "cockroach",
 		Database: "cockroach",

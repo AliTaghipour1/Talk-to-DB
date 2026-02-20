@@ -24,6 +24,13 @@ func (r QueryResult) Json() (string, error) {
 	// Create a slice to hold all results
 	var results []map[string]string
 
+	// Get column types for better type handling
+	columnTypes, err := r.ColumnTypes()
+	if err != nil {
+		log.Printf("error getting column types: %v", err)
+		// Continue anyway, we'll do our best with reflection
+	}
+
 	// Iterate through rows
 	for r.Next() {
 		// Create a slice of interface{} to hold values
@@ -47,8 +54,9 @@ func (r QueryResult) Json() (string, error) {
 			if val == nil {
 				strVal = "null"
 			} else {
+				toGo := SQLValueToGo(columnTypes[i], val)
 				// Convert to string using fmt.Sprintf to handle all types
-				strVal = fmt.Sprintf("%v", val)
+				strVal = fmt.Sprintf("%s", toGo)
 			}
 			rowMap[col] = strVal
 		}
